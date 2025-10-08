@@ -1,0 +1,338 @@
+---
+
+💡 Prompt: “Frontend for Stock Prediction Website (No Auth, No Fake Data)”
+
+You are an expert frontend engineer.
+Create a modern, responsive React frontend for a Stock Prediction Website called “StockSight”.
+Ignore authentication, sign-up, and user profiles for now.
+Use real data fetched from backend APIs, not hardcoded or dummy data.
+The frontend must be production-ready, elegant, and fully responsive.
+
+
+---
+
+⚙ Tech Stack
+
+Framework: React (Vite or CRA)
+
+Styling: TailwindCSS
+
+Charts: Recharts or Chart.js
+
+HTTP Client: Axios or Fetch
+
+State Management: React Context or Zustand (optional but clean)
+
+Routing: React Router DOM
+
+
+
+---
+
+🎨 Design Theme
+
+Minimalistic and professional
+
+White background with blue gradients, glassmorphic cards, and rounded corners
+
+Smooth hover and loading animations
+
+Dark mode toggle (optional bonus)
+
+Responsive layout for desktop, tablet, and mobile
+
+
+
+---
+
+🧱 Project Structure
+
+frontend/
+│
+├── src/
+│   ├── components/
+│   │   ├── Navbar.jsx
+│   │   ├── Footer.jsx
+│   │   ├── StockCard.jsx
+│   │   ├── ChartContainer.jsx
+│   │   ├── LoadingSpinner.jsx
+│   │   └── ErrorMessage.jsx
+│   │
+│   ├── pages/
+│   │   ├── HomePage.jsx
+│   │   ├── PredictPage.jsx
+│   │   ├── HistoricalPage.jsx
+│   │   ├── NewsPage.jsx
+│   │   └── ComparePage.jsx
+│   │
+│   ├── services/
+│   │   └── api.js  # contains all Axios calls to backend
+│   │
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+│
+├── package.json
+└── tailwind.config.js
+
+
+---
+
+🧭 Navigation (Navbar)
+
+Logo: “StockSight” (stylized text with gradient)
+
+Links: Home | Predict | Historical | News | Compare
+
+Highlight active page
+
+Sticky navbar on scroll
+
+Collapsible menu on mobile
+
+
+
+---
+
+🏠 1. Home Page (Dashboard)
+
+Purpose: Overview of real stock market data
+Features:
+
+Search bar (enter stock symbol like “AAPL”)
+
+On search → fetch data via /api/stock/<symbol>
+
+Display:
+
+Current price, open, close, volume, and market cap
+
+Line chart showing recent performance (7D or 30D)
+
+“Trend Insight” card summarizing movement (Uptrend / Downtrend)
+
+
+Show “Top Searched” or “Recently Viewed” stocks from localStorage
+
+
+Visual:
+
+Hero section: Title “Empower your Investments with AI-driven Insights”
+
+Animated line chart
+
+Cards with hover effects for stock metrics
+
+
+
+---
+
+📈 2. Predict Page
+
+Purpose: Show ML-based stock predictions for next 7 days
+API: /api/predict/<symbol>
+
+UI Features:
+
+Input field for stock ticker
+
+Button: “Predict Now”
+
+Show:
+
+Actual vs Predicted prices chart (Recharts LineChart)
+
+Confidence interval shaded area
+
+Key metrics summary (expected growth %, volatility)
+
+
+Display text insight: “StockSight predicts AAPL may rise 2.8% next week.”
+
+
+Visual:
+
+Split layout → left for text, right for chart
+
+Use cards with glowing edges for predicted data
+
+
+
+---
+
+📜 3. Historical Page
+
+Purpose: Show historical stock performance with adjustable time ranges
+API: /api/stock/<symbol>?range=1M|6M|1Y|5Y
+
+UI Features:
+
+Dropdown for time range
+
+Line chart with tooltips
+
+Moving average overlay (MA10, MA50, MA200)
+
+Download button for CSV
+
+Loading and error states
+
+
+
+---
+
+📰 4. News Page
+
+Purpose: Show real market news and sentiment
+API: /api/news/<symbol>
+
+UI Features:
+
+Input for stock ticker
+
+On search → fetch and render:
+
+Article title
+
+Short summary
+
+Source + link
+
+Sentiment indicator (🔴 Negative / 🟢 Positive / ⚪ Neutral)
+
+
+Optional: Small sentiment pie chart or bar graph
+
+
+Visual:
+
+Masonry grid or vertical list with cards
+
+News cards animate on hover
+
+Include logos or favicons for credibility
+
+
+
+---
+
+⚖ 5. Compare Page
+
+Purpose: Compare two stocks visually
+API: /api/compare?symbol1=<AAPL>&symbol2=<MSFT>
+
+UI Features:
+
+Two input fields
+
+“Compare” button
+
+Dual line chart (side-by-side or overlay)
+
+Display summary cards:
+
+7-day % change
+
+1-month trend
+
+Market cap difference
+
+
+
+
+---
+
+🧩 6. Common Components
+
+StockCard.jsx
+
+Displays brief stock info (symbol, price, change %)
+
+Reusable in home/recent section
+
+
+ChartContainer.jsx
+
+Generic chart wrapper with props for labels, data, colors
+
+
+LoadingSpinner.jsx
+
+Animated spinner using Tailwind + keyframes
+
+
+ErrorMessage.jsx
+
+Reusable alert box with red background and retry button
+
+
+Footer.jsx
+
+Links to API credits and disclaimer:
+“Data provided by Yahoo Finance / AlphaVantage. For educational use only.”
+
+
+
+---
+
+📡 API Integration
+
+All API requests should hit the backend routes (no mock data):
+
+Example:
+
+// services/api.js
+import axios from 'axios';
+const BASE_URL = 'http://localhost:8000/api';
+
+export async function getStock(symbol) {
+  const res = await axios.get(${BASE_URL}/stock/${symbol});
+  return res.data;
+}
+
+export async function getPrediction(symbol) {
+  const res = await axios.get(${BASE_URL}/predict/${symbol});
+  return res.data;
+}
+
+export async function getNews(symbol) {
+  const res = await axios.get(${BASE_URL}/news/${symbol});
+  return res.data;
+}
+
+
+---
+
+💅 UI Enhancements
+
+Use gradients: bg-gradient-to-r from-blue-500 to-purple-600
+
+Card shadows: shadow-lg shadow-blue-100
+
+Hover animations: smooth scale transitions
+
+Charts should have tooltips and responsive resizing
+
+Include “last updated at <timestamp>” on every data section
+
+
+
+---
+
+🚀 Expected Output
+
+A fully functional frontend UI that:
+
+Looks premium and minimal
+
+Fetches real data (not dummy values)
+
+Has all 5 core pages linked in Navbar
+
+Is responsive and mobile-friendly
+
+Handles loading, invalid stock symbols, and errors gracefully
+
+Ready to plug into any real backend
+
+
