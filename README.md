@@ -7,7 +7,6 @@
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript-5.6+-3178c6.svg)](https://www.typescriptlang.org/)
 [![Python](https://img.shields.io/badge/Python-3.8+-green.svg)](https://python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-13+-336791.svg)](https://postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **🤖 Real-time stock analysis powered by Machine Learning**
@@ -24,7 +23,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Active-success" alt="Status">
-  <img src="https://img.shields.io/badge/Last%20Updated-2024-informational" alt="Last Updated">
   <img src="https://img.shields.io/badge/Maintained-Yes-green" alt="Maintained">
 </p>
 
