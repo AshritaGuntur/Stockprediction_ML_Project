@@ -1,6 +1,7 @@
 import type { StockData, ChartDataPoint, PredictionData, NewsArticle, ComparisonData } from '@shared/schema';
 
-const BASE_URL = '/api';
+// Flask backend URL - change to your deployed backend URL in production
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
 export async function getStock(symbol: string): Promise<StockData> {
   const res = await fetch(`${BASE_URL}/stock/${symbol}`);

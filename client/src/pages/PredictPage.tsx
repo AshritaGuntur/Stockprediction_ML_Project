@@ -4,32 +4,33 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import ChartContainer from "@/components/ChartContainer";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorMessage from "@/components/ErrorMessage";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
-
-// TODO: remove mock functionality
-const mockPredictionData = [
-  { date: "Day 1", actual: 182, predicted: 182 },
-  { date: "Day 2", actual: 183, predicted: 183.5 },
-  { date: "Day 3", actual: 181, predicted: 182 },
-  { date: "Day 4", actual: null, predicted: 185 },
-  { date: "Day 5", actual: null, predicted: 186.5 },
-  { date: "Day 6", actual: null, predicted: 187 },
-  { date: "Day 7", actual: null, predicted: 188.2 },
-];
+import { getPrediction } from "@/lib/api";
+import type { PredictionData } from "@shared/schema";
 
 export default function PredictPage() {
   const [symbol, setSymbol] = useState("");
-  const [prediction, setPrediction] = useState<any>(null);
+  const [prediction, setPrediction] = useState<PredictionData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handlePredict = () => {
-    console.log("Predicting for:", symbol);
-    // TODO: remove mock functionality
-    setPrediction({
-      symbol: symbol.toUpperCase(),
-      expectedGrowth: 2.8,
-      volatility: 1.2,
-      insight: `StockSight predicts ${symbol.toUpperCase()} may rise 2.8% next week with moderate volatility.`,
-    });
+  const handlePredict = async () => {
+    if (!symbol.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await getPrediction(symbol);
+      setPrediction(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate prediction");
+      setPrediction(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -51,17 +52,22 @@ export default function PredictPage() {
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                 onKeyDown={(e) => e.key === "Enter" && handlePredict()}
+                disabled={loading}
                 data-testid="input-predict-symbol"
               />
-              <Button onClick={handlePredict} data-testid="button-predict">
+              <Button onClick={handlePredict} disabled={loading} data-testid="button-predict">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Predict Now
+                {loading ? "Predicting..." : "Predict Now"}
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {prediction && (
+        {error && <ErrorMessage message={error} />}
+        
+        {loading && <LoadingSpinner />}
+        
+        {prediction && !loading && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 space-y-4">
               <Card>
@@ -109,7 +115,7 @@ export default function PredictPage() {
                 subtitle={`Prediction generated: ${new Date().toLocaleString()}`}
               >
                 <ResponsiveContainer width="100%" height={400}>
-                  <LineChart data={mockPredictionData}>
+                  <LineChart data={[...prediction.actual, ...prediction.predicted]}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                     <XAxis dataKey="date" className="text-xs" />
                     <YAxis className="text-xs" domain={['dataMin - 2', 'dataMax + 2']} />
@@ -122,19 +128,11 @@ export default function PredictPage() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="actual"
+                      dataKey="price"
                       stroke="hsl(var(--chart-1))"
                       strokeWidth={2}
-                      name="Actual"
-                      connectNulls={false}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="predicted"
-                      stroke="hsl(var(--chart-2))"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      name="Predicted"
+                      name="Price"
+                      dot={{ r: 3 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>

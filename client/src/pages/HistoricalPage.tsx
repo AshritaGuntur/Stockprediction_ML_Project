@@ -4,50 +4,62 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import ChartContainer from "@/components/ChartContainer";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorMessage from "@/components/ErrorMessage";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-
-// TODO: remove mock functionality
-const mockHistoricalData = {
-  "1M": [
-    { date: "Jan 1", price: 175, ma10: 173, ma50: 170 },
-    { date: "Jan 8", price: 178, ma10: 175, ma50: 171 },
-    { date: "Jan 15", price: 176, ma10: 176, ma50: 172 },
-    { date: "Jan 22", price: 182, ma10: 178, ma50: 173 },
-  ],
-  "6M": [
-    { date: "Aug", price: 165, ma10: 163, ma50: 160, ma200: 155 },
-    { date: "Sep", price: 170, ma10: 167, ma50: 163, ma200: 157 },
-    { date: "Oct", price: 168, ma10: 168, ma50: 165, ma200: 159 },
-    { date: "Nov", price: 175, ma10: 171, ma50: 168, ma200: 161 },
-    { date: "Dec", price: 180, ma10: 174, ma50: 170, ma200: 163 },
-    { date: "Jan", price: 182, ma10: 177, ma50: 172, ma200: 165 },
-  ],
-  "1Y": [
-    { date: "Q1", price: 150, ma10: 148, ma50: 145, ma200: 140 },
-    { date: "Q2", price: 160, ma10: 155, ma50: 150, ma200: 145 },
-    { date: "Q3", price: 165, ma10: 162, ma50: 158, ma200: 150 },
-    { date: "Q4", price: 182, ma10: 175, ma50: 168, ma200: 160 },
-  ],
-};
+import { getStockHistory } from "@/lib/api";
+import type { ChartDataPoint } from "@shared/schema";
 
 export default function HistoricalPage() {
   const [symbol, setSymbol] = useState("");
   const [range, setRange] = useState("1M");
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ChartDataPoint[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = () => {
-    console.log("Fetching historical data for:", symbol, range);
-    // TODO: remove mock functionality
-    setData({
-      symbol: symbol.toUpperCase(),
-      range,
-      chartData: mockHistoricalData[range as keyof typeof mockHistoricalData],
-    });
+  const handleSearch = async () => {
+    if (!symbol.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const historyData = await getStockHistory(symbol, range);
+      setData(historyData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch historical data");
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDownload = () => {
-    console.log("Downloading CSV for:", symbol);
-    // TODO: implement CSV download
+    if (data.length === 0) return;
+    
+    // Create CSV content
+    const headers = ['Date', 'Price', 'MA10', 'MA50', 'MA200'];
+    const rows = data.map(d => [
+      d.date,
+      d.price,
+      d.ma10 || '',
+      d.ma50 || '',
+      d.ma200 || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+    
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${symbol}_${range}_history.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   return (
@@ -79,17 +91,21 @@ export default function HistoricalPage() {
               <SelectItem value="5Y">5 Years</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={handleSearch} data-testid="button-search-historical">
+          <Button onClick={handleSearch} disabled={loading} data-testid="button-search-historical">
             <Calendar className="h-4 w-4 mr-2" />
-            Load Data
+            {loading ? "Loading..." : "Load Data"}
           </Button>
         </div>
 
-        {data && (
+        {error && <ErrorMessage message={error} />}
+        
+        {loading && <LoadingSpinner />}
+        
+        {data.length > 0 && !loading && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">{data.symbol}</h2>
+                <h2 className="text-xl font-bold">{symbol.toUpperCase()}</h2>
                 <p className="text-sm text-muted-foreground">
                   Last updated: {new Date().toLocaleString()}
                 </p>
@@ -101,11 +117,11 @@ export default function HistoricalPage() {
             </div>
 
             <ChartContainer
-              title={`${data.symbol} - ${data.range} Historical Performance`}
+              title={`${symbol.toUpperCase()} - ${range} Historical Performance`}
               subtitle="Including moving averages (MA10, MA50, MA200)"
             >
               <ResponsiveContainer width="100%" height={400}>
-                <LineChart data={data.chartData}>
+                <LineChart data={data}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="date" className="text-xs" />
                   <YAxis className="text-xs" />
@@ -140,7 +156,7 @@ export default function HistoricalPage() {
                     strokeDasharray="3 3"
                     name="MA50"
                   />
-                  {data.chartData[0]?.ma200 && (
+                  {data[0]?.ma200 && (
                     <Line
                       type="monotone"
                       dataKey="ma200"
@@ -156,7 +172,7 @@ export default function HistoricalPage() {
           </div>
         )}
 
-        {!data && (
+        {data.length === 0 && !loading && (
           <div className="text-center py-12">
             <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">

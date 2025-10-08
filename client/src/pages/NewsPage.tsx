@@ -4,46 +4,32 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-// TODO: remove mock functionality
-const mockNews = [
-  {
-    id: "1",
-    title: "Tech Giant Announces Record Q4 Earnings",
-    summary: "Company exceeds analyst expectations with strong revenue growth across all segments.",
-    source: "Financial Times",
-    url: "#",
-    sentiment: "positive" as const,
-    publishedAt: "2 hours ago",
-  },
-  {
-    id: "2",
-    title: "Market Volatility Expected Following Fed Announcement",
-    summary: "Analysts predict increased market activity as Federal Reserve signals potential rate changes.",
-    source: "Bloomberg",
-    url: "#",
-    sentiment: "neutral" as const,
-    publishedAt: "5 hours ago",
-  },
-  {
-    id: "3",
-    title: "Supply Chain Concerns Impact Stock Performance",
-    summary: "Manufacturing delays and logistics challenges create headwinds for major tech stocks.",
-    source: "Reuters",
-    url: "#",
-    sentiment: "negative" as const,
-    publishedAt: "1 day ago",
-  },
-];
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorMessage from "@/components/ErrorMessage";
+import { getNews } from "@/lib/api";
+import type { NewsArticle } from "@shared/schema";
 
 export default function NewsPage() {
   const [symbol, setSymbol] = useState("");
-  const [news, setNews] = useState<any[]>([]);
+  const [news, setNews] = useState<NewsArticle[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = () => {
-    console.log("Fetching news for:", symbol);
-    // TODO: remove mock functionality
-    setNews(mockNews);
+  const handleSearch = async () => {
+    if (!symbol.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const newsData = await getNews(symbol);
+      setNews(newsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch news");
+      setNews([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getSentimentColor = (sentiment: string) => {
@@ -79,21 +65,24 @@ export default function NewsPage() {
         </div>
 
         <div className="flex gap-2 mb-8">
-          <Input
+            <Input
             type="text"
             placeholder="Enter stock symbol"
             value={symbol}
             onChange={(e) => setSymbol(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            disabled={loading}
             data-testid="input-news-symbol"
           />
-          <Button onClick={handleSearch} data-testid="button-search-news">
+          <Button onClick={handleSearch} disabled={loading} data-testid="button-search-news">
             <Newspaper className="h-4 w-4 mr-2" />
-            Search News
+            {loading ? "Loading..." : "Search News"}
           </Button>
         </div>
 
-        {news.length > 0 && (
+        {error && <ErrorMessage message={error} />}
+        
+        {news.length > 0 && !loading && (
           <div className="space-y-4">
             {news.map((article) => (
               <Card
@@ -135,7 +124,7 @@ export default function NewsPage() {
           </div>
         )}
 
-        {news.length === 0 && (
+        {news.length === 0 && !loading && (
           <div className="text-center py-12">
             <Newspaper className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">

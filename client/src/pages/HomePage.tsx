@@ -1,48 +1,64 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, TrendingUp, TrendingDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StockCard from "@/components/StockCard";
 import ChartContainer from "@/components/ChartContainer";
+import LoadingSpinner from "@/components/LoadingSpinner";
+import ErrorMessage from "@/components/ErrorMessage";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { getStock, getStockHistory } from "@/lib/api";
+import type { StockData, ChartDataPoint } from "@shared/schema";
 
-// TODO: remove mock functionality
-const mockChartData = [
-  { date: "Jan 1", price: 175 },
-  { date: "Jan 8", price: 178 },
-  { date: "Jan 15", price: 176 },
-  { date: "Jan 22", price: 182 },
-  { date: "Jan 29", price: 180 },
-  { date: "Feb 5", price: 185 },
-  { date: "Feb 12", price: 188 },
-];
-
-const mockRecentStocks = [
-  { symbol: "AAPL", name: "Apple Inc.", price: 182.45, change: 3.25, changePercent: 1.81 },
-  { symbol: "GOOGL", name: "Alphabet Inc.", price: 139.82, change: -1.15, changePercent: -0.82 },
-  { symbol: "MSFT", name: "Microsoft Corp.", price: 378.91, change: 5.42, changePercent: 1.45 },
-];
+// Default stocks to display
+const defaultStocks = ["AAPL", "GOOGL", "MSFT"];
 
 export default function HomePage() {
   const [symbol, setSymbol] = useState("");
-  const [selectedStock, setSelectedStock] = useState<any>(null);
+  const [selectedStock, setSelectedStock] = useState<StockData | null>(null);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [recentStocks, setRecentStocks] = useState<StockData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = () => {
-    console.log("Searching for:", symbol);
-    // TODO: remove mock functionality
-    setSelectedStock({
-      symbol: symbol.toUpperCase(),
-      name: `${symbol.toUpperCase()} Company`,
-      price: 182.45,
-      open: 179.20,
-      close: 182.45,
-      volume: 52847392,
-      marketCap: 2847392847392,
-      change: 3.25,
-      changePercent: 1.81,
-      trend: "Uptrend",
-    });
+  // Load default stocks on mount
+  useEffect(() => {
+    loadDefaultStocks();
+  }, []);
+
+  const loadDefaultStocks = async () => {
+    try {
+      const stocks = await Promise.all(
+        defaultStocks.map(sym => getStock(sym).catch(() => null))
+      );
+      setRecentStocks(stocks.filter(s => s !== null) as StockData[]);
+    } catch (err) {
+      console.error("Error loading default stocks:", err);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!symbol.trim()) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [stockData, historyData] = await Promise.all([
+        getStock(symbol),
+        getStockHistory(symbol, "1M")
+      ]);
+      
+      setSelectedStock(stockData);
+      setChartData(historyData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch stock data");
+      setSelectedStock(null);
+      setChartData([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,10 +86,11 @@ export default function HomePage() {
               <Button
                 onClick={handleSearch}
                 variant="secondary"
+                disabled={loading}
                 data-testid="button-search"
               >
                 <Search className="h-4 w-4 mr-2" />
-                Search
+                {loading ? "Searching..." : "Search"}
               </Button>
             </div>
           </div>
@@ -81,7 +98,11 @@ export default function HomePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {selectedStock && (
+        {error && <ErrorMessage message={error} />}
+        
+        {loading && <LoadingSpinner />}
+        
+        {selectedStock && !loading && (
           <div className="mb-8 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
@@ -126,68 +147,72 @@ export default function HomePage() {
               <Card>
                 <CardHeader className="gap-1 space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Trend Insight
+                    Change
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-2">
-                    {selectedStock.trend === "Uptrend" ? (
+                    {selectedStock.changePercent >= 0 ? (
                       <TrendingUp className="h-5 w-5 text-green-500" />
                     ) : (
                       <TrendingDown className="h-5 w-5 text-red-500" />
                     )}
-                    <p className="text-lg font-bold" data-testid="text-trend">
-                      {selectedStock.trend}
+                    <p className={`text-lg font-bold ${selectedStock.changePercent >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-trend">
+                      {selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent}%
                     </p>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            <ChartContainer
-              title={`${selectedStock.symbol} - 30 Day Performance`}
-              subtitle={`Last updated: ${new Date().toLocaleString()}`}
-            >
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={mockChartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="date" className="text-xs" />
-                  <YAxis className="text-xs" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "6px",
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="price"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {chartData.length > 0 && (
+              <ChartContainer
+                title={`${selectedStock.symbol} - 30 Day Performance`}
+                subtitle={`Last updated: ${new Date(selectedStock.lastUpdated).toLocaleString()}`}
+              >
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="date" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "6px",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="price"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            )}
           </div>
         )}
 
-        <div>
-          <h2 className="text-2xl font-bold mb-4">Recently Viewed</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mockRecentStocks.map((stock) => (
-              <StockCard
-                key={stock.symbol}
-                {...stock}
-                onClick={() => {
-                  setSymbol(stock.symbol);
-                  handleSearch();
-                }}
-              />
-            ))}
+        {!loading && recentStocks.length > 0 && (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Popular Stocks</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recentStocks.map((stock) => (
+                <StockCard
+                  key={stock.symbol}
+                  {...stock}
+                  onClick={() => {
+                    setSymbol(stock.symbol);
+                    handleSearch();
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
