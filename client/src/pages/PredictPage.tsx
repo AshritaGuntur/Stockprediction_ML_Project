@@ -105,6 +105,18 @@ export default function PredictPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm" data-testid="text-ai-insight">{prediction.insight}</p>
+                  {prediction.modelUsed && (
+                    <div className="mt-3 pt-3 border-t border-primary/20">
+                      <p className="text-xs text-muted-foreground">
+                        Model: <span className="font-medium text-primary">{prediction.modelUsed.replace('_', ' ')}</span>
+                        {prediction.modelSource && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            (Source: {prediction.modelSource})
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -112,7 +124,7 @@ export default function PredictPage() {
             <div className="lg:col-span-2">
               <ChartContainer
                 title={`${prediction.symbol} - 7 Day Forecast`}
-                subtitle={`Prediction generated: ${new Date().toLocaleString()}`}
+                subtitle={`Prediction generated: ${new Date().toLocaleString()}${prediction.modelUsed ? ` • ${prediction.modelUsed.replace('_', ' ')}` : ''}${prediction.modelSource ? ` (${prediction.modelSource})` : ''}`}
               >
                 <ResponsiveContainer width="100%" height={400}>
                   <LineChart data={[...prediction.actual, ...prediction.predicted]}>

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, real, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -16,6 +16,36 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// ML Models table for storing trained models
+export const mlModels = pgTable("ml_models", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  version: text("version").notNull(),
+  modelType: text("model_type").notNull(), // 'stock_prediction', 'sentiment_analysis', etc.
+  modelData: jsonb("model_data").notNull(), // Store the pickled model data as JSON
+  metadata: jsonb("metadata"), // Training metadata, performance metrics, etc.
+  features: jsonb("features"), // Feature columns used in training
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  isActive: integer("is_active").default(1).notNull(), // 1 for active, 0 for inactive
+  trainedBy: text("trained_by"), // User who trained the model
+  description: text("description"),
+});
+
+export const insertMLModelSchema = createInsertSchema(mlModels).pick({
+  name: true,
+  version: true,
+  modelType: true,
+  modelData: true,
+  metadata: true,
+  features: true,
+  trainedBy: true,
+  description: true,
+});
+
+export type InsertMLModel = z.infer<typeof insertMLModelSchema>;
+export type MLModel = typeof mlModels.$inferSelect;
 
 // Stock data types
 export interface StockData {
@@ -53,6 +83,8 @@ export interface PredictionData {
   insight: string;
   expectedGrowth: number;
   volatility: number;
+  modelUsed?: string;
+  modelSource?: string;
 }
 
 export interface NewsArticle {
