@@ -7,10 +7,14 @@ import os
 from datetime import datetime, timedelta
 import yfinance as yf
 from newsapi import NewsApiClient
+from dotenv import load_dotenv
 import warnings
 warnings.filterwarnings('ignore')
 
 from database import save_model_to_db, load_model_from_db, get_db_model_metadata
+
+# Load environment variables
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -24,9 +28,15 @@ METADATA_PATH = os.path.join(MODEL_DIR, "metadata.pkl")
 # Initialize NewsAPI (you'll need to set your API key)
 # Get free API key from: https://newsapi.org/
 NEWS_API_KEY = os.getenv('NEWS_API_KEY', 'your_api_key_here')
+print(f"NewsAPI Key loaded: {NEWS_API_KEY[:10]}..." if NEWS_API_KEY != 'your_api_key_here' else "NewsAPI Key not configured")
 try:
     newsapi = NewsApiClient(api_key=NEWS_API_KEY) if NEWS_API_KEY != 'your_api_key_here' else None
-except:
+    if newsapi:
+        print("✅ NewsAPI initialized successfully")
+    else:
+        print("⚠️ NewsAPI not initialized - using demo news")
+except Exception as e:
+    print(f"❌ Error initializing NewsAPI: {e}")
     newsapi = None
 
 # =============================
@@ -346,27 +356,36 @@ def generate_simple_prediction(symbol):
         return None
 
 def get_news_for_stock(symbol):
-    """Fetch news articles for a stock"""
+    """Fetch news articles for a stock using Yahoo Finance"""
     try:
-        if newsapi is None:
-            # Return sample news if API not configured with working links
-            ticker = yf.Ticker(symbol)
-            company_name = ticker.info.get('longName', symbol)
-            
+        # Fetch news directly from Yahoo Finance
+        ticker = yf.Ticker(symbol)
+        company_name = ticker.info.get('longName', symbol)
+        
+        # Get news from yfinance
+        try:
+            news = ticker.news
+        except:
+            news = []
+        
+        print(f"Fetching news for {symbol}, found {len(news)} articles")
+        
+        if not news or len(news) == 0:
+            # Return sample news if no news available
             return [
                 {
                     'id': '1',
                     'title': f'{symbol} Stock Analysis - Market Update',
-                    'summary': f'Latest market analysis and insights for {symbol}. To get real news articles, configure NEWS_API_KEY in backend/.env file. Get your free API key from newsapi.org',
-                    'source': 'StockSight Demo',
+                    'summary': f'Latest market analysis and insights for {company_name} ({symbol}). Check Yahoo Finance for more details.',
+                    'source': 'Yahoo Finance',
                     'url': f'https://finance.yahoo.com/quote/{symbol}/news',
                     'sentiment': 'neutral',
                     'publishedAt': datetime.now().isoformat()
                 },
                 {
                     'id': '2',
-                    'title': f'{company_name} - Recent Developments',
-                    'summary': f'Click "Read More" to view real news about {symbol} on Yahoo Finance. For automated news fetching, add your NewsAPI key.',
+                    'title': f'{company_name} - Company Overview',
+                    'summary': f'View detailed information, financials, and news about {company_name} ({symbol}).',
                     'source': 'Yahoo Finance',
                     'url': f'https://finance.yahoo.com/quote/{symbol}',
                     'sentiment': 'neutral',
@@ -374,51 +393,86 @@ def get_news_for_stock(symbol):
                 }
             ]
         
-        # Fetch real news
-        ticker = yf.Ticker(symbol)
-        company_name = ticker.info.get('longName', symbol)
-        
-        articles = newsapi.get_everything(
-            q=f'{symbol} OR {company_name}',
-            language='en',
-            sort_by='publishedAt',
-            page_size=10
-        )
-        
         news_list = []
-        for i, article in enumerate(articles.get('articles', [])[:10]):
-            # Simple sentiment analysis based on keywords
-            title_lower = article['title'].lower()
-            description_lower = (article.get('description') or '').lower()
-            
-            positive_words = ['gain', 'rise', 'up', 'growth', 'profit', 'success', 'beat', 'surge']
-            negative_words = ['fall', 'drop', 'down', 'loss', 'decline', 'miss', 'concern', 'risk']
-            
-            pos_count = sum(1 for word in positive_words if word in title_lower or word in description_lower)
-            neg_count = sum(1 for word in negative_words if word in title_lower or word in description_lower)
-            
-            if pos_count > neg_count:
-                sentiment = 'positive'
-            elif neg_count > pos_count:
-                sentiment = 'negative'
-            else:
-                sentiment = 'neutral'
-            
-            news_list.append({
-                'id': str(i + 1),
-                'title': article['title'],
-                'summary': article.get('description', 'No description available'),
-                'source': article['source']['name'],
-                'url': article['url'],
-                'sentiment': sentiment,
-                'publishedAt': article['publishedAt']
-            })
+        for i, article in enumerate(news[:10]):
+            try:
+                # Extract content object
+                content = article.get('content', {})
+                
+                # Extract title from content
+                title = content.get('title', '') or f'{symbol} News Update'
+                
+                # Extract summary/description from content
+                summary = (content.get('summary', '') or 
+                          content.get('description', '') or 
+                          title)  # Use title as fallback
+                
+                title_lower = title.lower()
+                summary_lower = summary.lower()
+                
+                positive_words = ['gain', 'rise', 'up', 'growth', 'profit', 'success', 'beat', 'surge', 'bullish', 'strong']
+                negative_words = ['fall', 'drop', 'down', 'loss', 'decline', 'miss', 'concern', 'risk', 'bearish', 'weak']
+                
+                pos_count = sum(1 for word in positive_words if word in title_lower or word in summary_lower)
+                neg_count = sum(1 for word in negative_words if word in title_lower or word in summary_lower)
+                
+                if pos_count > neg_count:
+                    sentiment = 'positive'
+                elif neg_count > pos_count:
+                    sentiment = 'negative'
+                else:
+                    sentiment = 'neutral'
+                
+                # Convert timestamp to ISO format
+                published_at = content.get('pubDate')
+                if published_at:
+                    try:
+                        # pubDate is already in ISO format
+                        published_at = published_at
+                    except:
+                        published_at = datetime.now().isoformat()
+                else:
+                    published_at = datetime.now().isoformat()
+                
+                # Extract URL from content
+                url = content.get('canonicalUrl', {}).get('url', '') or f'https://finance.yahoo.com/quote/{symbol}/news'
+                
+                # Extract source from content provider
+                provider = content.get('provider', {})
+                source = provider.get('displayName', 'Yahoo Finance')
+                
+                news_list.append({
+                    'id': str(i + 1),
+                    'title': title,
+                    'summary': summary,
+                    'source': source,
+                    'url': url,
+                    'sentiment': sentiment,
+                    'publishedAt': published_at
+                })
+            except Exception as e:
+                print(f"Error processing article {i}: {e}")
+                continue
         
+        print(f"Returning {len(news_list)} news articles for {symbol}")
         return news_list
         
     except Exception as e:
-        print(f"Error fetching news: {e}")
-        return []
+        print(f"Error fetching news for {symbol}: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return fallback news
+        return [
+            {
+                'id': '1',
+                'title': f'{symbol} - Market Information',
+                'summary': f'Unable to fetch news for {symbol}. Please try again later or check Yahoo Finance directly.',
+                'source': 'Yahoo Finance',
+                'url': f'https://finance.yahoo.com/quote/{symbol}/news',
+                'sentiment': 'neutral',
+                'publishedAt': datetime.now().isoformat()
+            }
+        ]
 
 # =============================
 # API ROUTES
